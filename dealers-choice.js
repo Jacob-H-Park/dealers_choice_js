@@ -1,52 +1,71 @@
 const express = require("express");
 const morgan = require("morgan");
-const dataStorage = require("./dataStorage");
-
+const html = require("html-template-tag");
+const { Client } = require("pg");
+const client = new Client("postgres://localhost/dealers_choice");
+client.connect();
 const app = express();
 
+app.get("/", async (req, res, next) => {
+  try {
+    const result = await client.query("SELECT * FROM companies");
+    const companies = result.rows;
+
+    const faang = html`
+    <html>
+      <head>
+        <title>FAANG Companies</title>
+      </head>
+      <body>
+        <h1>FAANG Companies</title>
+        <div>${companies.map(
+          (company) =>
+            html`<div>
+              <a href="/companies/${company.name}">${company.name}</a>
+            </div>`
+        )}
+        </div>
+      </body>
+      </html>
+    `;
+    res.send(faang);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.use("/companies/:name", async (req, res, next) => {
+  try {
+    const name = req.params.name;
+    result = await client.query(`
+SELECT ceo, name, revenue, number_of_employees FROM companies
+WHERE companies.name = '${name}'
+`);
+    const chosenCompany = result.rows[0];
+    const htmls = html`
+    <html>
+      <head>
+        <title>FAANG Companies</title>
+      </head>
+      <body>
+        <h1><a href='/'>MAIN</a></h1>
+        <h1>COMPANY: ${chosenCompany.name}</title>
+        <p></p>
+        <div>
+          CEO: ${chosenCompany.ceo}
+        </div>
+        <p>REVENUE: ${chosenCompany.revenue}</p>
+        <p>NUMBER OF EMPLOYEES: ${chosenCompany.number_of_employees}</p>
+      </body>
+      </html>
+    `;
+    res.send(htmls);
+  } catch (err) {
+    next(err);
+  }
+});
 const PORT = process.env.Port || 3000;
 app.use(morgan("dev"));
-
-app.get("/", (req, res) => {
-  const companies = dataStorage.list();
-  const html = `<!DOCTYPE html>
-  <html lang="en">
-  <head>
-    <link rel="stylesheet" href="style.css" />
-    <title>FAANG Companies</title>
-  </head>
-  <body>
-    <h1>Tech Giants</h1>
-    <ul>
-      ${companies
-        .map(
-          (company) =>
-            `<h2><a href='/companies/${company.Name}'>${company.Name}</a></h2>`
-        )
-        .join("\n")}
-  </body>
-  </html>`;
-  res.send(html);
-});
-
-app.use("/companies/:name", (req, res) => {
-  const name = req.params.name;
-  const company = dataStorage.find(name);
-  const html = `<!DOCTYPE html>
-  <html lang="en">
-  <head>
-    <link rel="stylesheet" href="style.css" />
-    <title>FAANG Companies</title>
-  </head>
-  <body>
-    <h1><a href ='/'>${company.Name}</a></h1>
-    <p class='CEO'>CEO: ${company.CEO} </p>
-    <p>Revenue: ${company.Revenue}</p>
-    <p>Number of Employees: ${company.NumberOfEmployees} </p>
-  </body>
-  </html>`;
-  res.send(html);
-});
 
 app.listen(PORT, () => {
   console.log(`Listening on port ${PORT}`);
